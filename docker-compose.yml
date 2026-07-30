@@ -1,0 +1,84 @@
+# ============================================================================
+# MPP Monorepo — local development stack
+# ----------------------------------------------------------------------------
+# Default `docker compose up -d` starts INFRA only (postgres + redis) so you can
+# run the apps with hot-reload via `make api-dev` / `make web-dev`.
+# Use the `full` profile to also run the containerized api + web:
+#     docker compose --profile full up -d      (or: make up-full)
+# ============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-mpp}
+      TZ: UTC
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-mpp}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    profiles: ["full"]
+    build:
+      context: ./apps/api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      TZ: UTC
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_NAME: ${POSTGRES_DB:-mpp}
+      DB_SSLMODE: disable
+      SERVER_PORT: 8080
+      ENV: ${ENV:-development}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-min-32-characters-long}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 10
+    ports:
+      - "${API_PORT:-8080}:8080"
+
+  web:
+    profiles: ["full"]
+    build:
+      context: ./apps/web
+      args:
+        BUILD_STANDALONE: "true"
+    depends_on:
+      - api
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+      NEXT_PUBLIC_COMPANY_SLUG: ${NEXT_PUBLIC_COMPANY_SLUG:-mpp}
+      NEXT_PUBLIC_CLIENT_SLUG: ${NEXT_PUBLIC_CLIENT_SLUG:-mpp}
+    ports:
+      - "${WEB_PORT:-8002}:80"
+
+volumes:
+  pgdata:
+  redisdata:
