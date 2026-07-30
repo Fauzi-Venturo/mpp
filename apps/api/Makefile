@@ -1,4 +1,4 @@
-.PHONY: help migrate-up migrate-down migrate-create migrate-force migrate-version seed seed-core db-setup db-reset dev build run
+.PHONY: help migrate-up migrate-down migrate-create migrate-force migrate-version seed seed-core seed-mpp db-setup db-reset dev build run
 
 help:
 	@echo "Available commands:"
@@ -18,6 +18,7 @@ help:
 	@echo "Seeding commands:"
 	@echo "  make seed                    - Run all seeders"
 	@echo "  make seed-core               - Run core module seeders only"
+	@echo "  make seed-mpp                - Run MPP module seeders only"
 	@echo ""
 	@echo "Setup commands:"
 	@echo "  make db-setup                - Run migrations + seeders (fresh setup)"
@@ -37,6 +38,10 @@ migrate-up:
 	@if [ -d "$(MIGRATIONS_PATH)/core" ]; then \
 		echo "Running core migrations..."; \
 		migrate -path $(MIGRATIONS_PATH)/core -database "$(DB_URL)&x-migrations-table=schema_migrations_core" up; \
+	fi
+	@if [ -d "$(MIGRATIONS_PATH)/mpp" ]; then \
+		echo "Running mpp migrations..."; \
+		migrate -path $(MIGRATIONS_PATH)/mpp -database "$(DB_URL)&x-migrations-table=schema_migrations_mpp" up; \
 	fi
 
 migrate-down:
@@ -72,7 +77,19 @@ seed-core:
 	fi
 	@echo "✅ Core seeders completed!"
 
-seed: seed-core
+seed-mpp:
+	@echo "Running mpp seeders..."
+	@if [ -d "$(SEEDERS_PATH)/mpp" ]; then \
+		for file in $(SEEDERS_PATH)/mpp/*.sql; do \
+			if [ -f "$$file" ]; then \
+				echo "Running seeder: $$(basename $$file)"; \
+				PGPASSWORD=$(DB_PASSWORD) psql -v ON_ERROR_STOP=1 -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME) -f $$file || exit 1; \
+			fi; \
+		done; \
+	fi
+	@echo "✅ MPP seeders completed!"
+
+seed: seed-core seed-mpp
 	@echo "✅ All seeders completed!"
 
 # Database setup commands
