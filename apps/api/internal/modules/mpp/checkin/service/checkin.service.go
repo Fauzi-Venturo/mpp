@@ -12,6 +12,7 @@ import (
 	"github.com/ndollem/mpp/apps/api/internal/modules/mpp/checkin/repository"
 	queueDomain "github.com/ndollem/mpp/apps/api/internal/modules/mpp/queue/domain"
 	"github.com/ndollem/mpp/apps/api/pkg/qrtoken"
+	"github.com/ndollem/mpp/apps/api/pkg/types"
 )
 
 var (
@@ -55,6 +56,7 @@ func (s *CheckinService) Create(ctx context.Context, req dto.CheckinRequest) (*d
 		BookingDate: stored.BookingDate,
 		ExpiresAt:   stored.ExpiresAt,
 		UsedAt:      stored.CheckedInAt, // the schema records "used" as checked_in_at
+		Location:    types.ServiceZone, // the booking day is a local day, not a UTC one
 	}, req.QRToken, time.Now().UTC())
 	if err != nil {
 		return nil, errors.Join(ErrTokenRejected, err)

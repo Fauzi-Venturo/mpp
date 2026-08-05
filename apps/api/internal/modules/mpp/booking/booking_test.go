@@ -231,10 +231,12 @@ func TestCreateBooking_IssuesAQrTokenValidUntilTheEndOfTheBookingDay(t *testing.
 	e := decode(t, w)
 	require.NotEmpty(t, e.Data.QRToken, "booking response must carry the QR token")
 	require.Equal(t, e.Data.QRToken, f.storedToken(t, e.Data.ID))
+	// Midnight WIB closing the booking day, i.e. 17:00 UTC the day before —
+	// expiring at 00:00 UTC would keep the token alive until 07:00 local.
 	require.Equal(t,
-		time.Date(2099, 1, 8, 0, 0, 0, 0, time.UTC),
+		time.Date(2099, 1, 7, 17, 0, 0, 0, time.UTC),
 		e.Data.QRExpiresAt.UTC(),
-		"token must expire when the booking day ends")
+		"token must expire when the booking day ends in the service zone")
 }
 
 func TestCreateBooking_GivesEveryBookingItsOwnToken(t *testing.T) {

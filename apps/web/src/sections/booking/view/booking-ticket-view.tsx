@@ -22,10 +22,40 @@ type Props = {
   now?: Date;
 };
 
+// Only a live booking may be scanned; anything else must not show a code the kiosk
+// would refuse anyway (BR-09). The reason matters to the citizen: "already checked
+// in" is good news, "cancelled" is not.
+const STATUS_NOTICE: Record<string, { severity: 'info' | 'success' | 'warning'; text: string }> = {
+  CHECKED_IN: {
+    severity: 'info',
+    text: 'Anda sudah check-in. Nomor antrean sudah terbit — silakan tunggu dipanggil.',
+  },
+  SERVING: {
+    severity: 'info',
+    text: 'Anda sudah check-in dan sedang dilayani di loket.',
+  },
+  DONE: {
+    severity: 'success',
+    text: 'Layanan sudah selesai dilayani. Terima kasih.',
+  },
+  EXPIRED: {
+    severity: 'warning',
+    text: 'Booking ini kedaluwarsa karena tidak hadir pada tanggal layanan. Silakan daftar ulang.',
+  },
+  CANCELLED: {
+    severity: 'warning',
+    text: 'Booking ini sudah dibatalkan, jadi QR check-in tidak diterbitkan.',
+  },
+};
+
+const FALLBACK_NOTICE = {
+  severity: 'warning' as const,
+  text: 'Booking ini tidak aktif, jadi QR check-in tidak diterbitkan.',
+};
+
 export function BookingTicketView({ booking, now }: Props) {
-  // Only a live booking may be scanned; a cancelled or expired one must not show
-  // a code the kiosk would refuse anyway (BR-09).
   const active = booking.status === 'BOOKED';
+  const notice = STATUS_NOTICE[booking.status] ?? FALLBACK_NOTICE;
 
   return (
     <Container sx={{ py: 5 }}>
@@ -54,9 +84,7 @@ export function BookingTicketView({ booking, now }: Props) {
                 now={now}
               />
             ) : (
-              <Alert severity="warning">
-                Booking ini sudah dibatalkan atau tidak aktif, jadi QR check-in tidak diterbitkan.
-              </Alert>
+              <Alert severity={notice.severity}>{notice.text}</Alert>
             )}
           </Stack>
         </Card>

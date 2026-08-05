@@ -9,6 +9,7 @@ import (
 	"github.com/ndollem/mpp/apps/api/internal/modules/mpp/booking/dto"
 	"github.com/ndollem/mpp/apps/api/internal/modules/mpp/booking/repository"
 	"github.com/ndollem/mpp/apps/api/pkg/qrtoken"
+	"github.com/ndollem/mpp/apps/api/pkg/types"
 )
 
 // defaultCheckinWindow keeps a QR token usable for the whole booking day, counted
@@ -56,7 +57,7 @@ func (s *BookingService) Create(ctx context.Context, companySlug string, req dto
 		channel = domain.BookingChannelWeb
 	}
 
-	qr, err := qrtoken.Issue(req.Tanggal.Time, defaultCheckinWindow)
+	qr, err := qrtoken.Issue(req.Tanggal.Time, defaultCheckinWindow, types.ServiceZone)
 	if err != nil {
 		return nil, err
 	}

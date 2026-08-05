@@ -40,17 +40,20 @@ type Stored struct {
 	BookingDate time.Time
 	ExpiresAt   time.Time
 	UsedAt      *time.Time // nil while the token is unused
+	// Location is the zone the booking day is read in; nil means UTC.
+	Location *time.Location
 }
 
-// Issue creates a token for a booking. The window is measured from the start of the
-// booking day (UTC), so an afternoon booking still expires with its own day.
-func Issue(bookingDate time.Time, window time.Duration) (Token, error) {
+// Issue creates a token for a booking. The window is measured from midnight of the
+// booking day IN loc, so an afternoon booking still expires with its own local day.
+// A nil loc falls back to UTC.
+func Issue(bookingDate time.Time, window time.Duration, loc *time.Location) (Token, error) {
 	value, err := token.GenerateSecureToken(tokenBytes)
 	if err != nil {
 		return Token{}, err
 	}
 
-	return Token{Value: value, ExpiresAt: startOfDay(bookingDate).Add(window)}, nil
+	return Token{Value: value, ExpiresAt: startOfDay(bookingDate, loc).Add(window)}, nil
 }
 
 // Validate reports why a scan must be refused, or nil when the token may be spent.
@@ -62,7 +65,7 @@ func Validate(s Stored, presented string, now time.Time) error {
 	if s.UsedAt != nil {
 		return ErrUsed
 	}
-	if now.Before(startOfDay(s.BookingDate)) {
+	if now.Before(startOfDay(s.BookingDate, s.Location)) {
 		return ErrWrongDay
 	}
 	if now.After(s.ExpiresAt) {
@@ -72,7 +75,13 @@ func Validate(s Stored, presented string, now time.Time) error {
 	return nil
 }
 
-func startOfDay(t time.Time) time.Time {
+// startOfDay reads the calendar date off t (stored as UTC midnight) and returns
+// the instant that day begins in loc.
+func startOfDay(t time.Time, loc *time.Location) time.Time {
+	if loc == nil {
+		loc = time.UTC
+	}
 	utc := t.UTC()
-	return time.Date(utc.Year(), utc.Month(), utc.Day(), 0, 0, 0, 0, time.UTC)
+
+	return time.Date(utc.Year(), utc.Month(), utc.Day(), 0, 0, 0, 0, loc)
 }

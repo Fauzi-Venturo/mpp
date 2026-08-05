@@ -35,10 +35,34 @@ describe('BookingTicketView', () => {
     expect(screen.getByText(/Tanggal layanan 10 Aug 2026/)).toBeInTheDocument();
   });
 
-  it('withholds the QR when the booking is no longer active', async () => {
+  it('withholds the QR when the booking is cancelled', async () => {
     render(<BookingTicketView booking={{ ...booking, status: 'CANCELLED' }} now={beforeExpiry} />);
 
-    expect(await screen.findByText(/dibatalkan|tidak aktif/i)).toBeInTheDocument();
+    expect(await screen.findByText(/dibatalkan/i)).toBeInTheDocument();
     expect(screen.queryByRole('img', { name: /qr/i })).not.toBeInTheDocument();
+  });
+
+  // A citizen who already scanned has not been "cancelled" — telling them so is
+  // both wrong and alarming.
+  it('tells an already checked-in citizen that they are in the queue', async () => {
+    render(<BookingTicketView booking={{ ...booking, status: 'CHECKED_IN' }} now={beforeExpiry} />);
+
+    expect(await screen.findByText(/sudah check-in/i)).toBeInTheDocument();
+    expect(screen.queryByText(/dibatalkan/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: /qr/i })).not.toBeInTheDocument();
+  });
+
+  it('tells a served citizen that their service is finished', async () => {
+    render(<BookingTicketView booking={{ ...booking, status: 'DONE' }} now={beforeExpiry} />);
+
+    expect(await screen.findByText(/selesai dilayani/i)).toBeInTheDocument();
+    expect(screen.queryByText(/dibatalkan/i)).not.toBeInTheDocument();
+  });
+
+  it('explains an expired booking as a missed slot, not a cancellation', async () => {
+    render(<BookingTicketView booking={{ ...booking, status: 'EXPIRED' }} now={beforeExpiry} />);
+
+    expect(await screen.findByText(/kedaluwarsa|tidak hadir/i)).toBeInTheDocument();
+    expect(screen.queryByText(/dibatalkan/i)).not.toBeInTheDocument();
   });
 });
