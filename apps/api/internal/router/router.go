@@ -20,6 +20,10 @@ import (
 
 	// MPP modules
 	"github.com/ndollem/mpp/apps/api/internal/modules/mpp/booking"
+	"github.com/ndollem/mpp/apps/api/internal/modules/mpp/checkin"
+	"github.com/ndollem/mpp/apps/api/internal/modules/mpp/loket_ops"
+	"github.com/ndollem/mpp/apps/api/internal/modules/mpp/queue"
+	"github.com/ndollem/mpp/apps/api/internal/modules/mpp/serving"
 
 	"github.com/ndollem/mpp/apps/api/internal/shared/audit"
 	"github.com/ndollem/mpp/apps/api/internal/shared/authz"
@@ -217,6 +221,28 @@ func Setup(router *gin.Engine, db *pgxpool.Pool, cfg *config.Config) {
 		// than a JWT claim, so no JWTAuth here.
 		bookingModule := booking.Initialize(db)
 		bookingModule.SetupRoutes(mppV1)
+
+		// Queue module owns mpp.antrian and the Redis per-service daily
+		// counters that make number allocation atomic.
+		queueModule := queue.Initialize(db, redisClient)
+		queueModule.SetupRoutes(mppV1)
+
+		// Kiosk check-in. Devices authenticate with X-API-Key, applied inside
+		// the module's own SetupRoutes.
+		checkinModule := checkin.Initialize(db)
+		checkinModule.SetupRoutes(mppV1)
+
+		// Wire the allocator so a successful scan also hands out a number,
+		// in the same transaction as the BOOKED -> CHECKED_IN transition.
+		checkinModule.Service.SetEnqueuer(queueModule.Service)
+
+		// Operator (loket) actions: call next / recall / start / skip.
+		loketOpsModule := loket_ops.Initialize(db)
+		loketOpsModule.SetupRoutes(mppV1)
+
+		// Closing the serving stage: finish a service and drive the TV.
+		servingModule := serving.Initialize(db)
+		servingModule.SetupRoutes(mppV1)
 	}
 
 	log.Info("Routes setup completed", zap.Int("routes", len(router.Routes())))
