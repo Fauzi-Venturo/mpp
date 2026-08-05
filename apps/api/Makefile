@@ -1,4 +1,4 @@
-.PHONY: help migrate-up migrate-down migrate-create migrate-force migrate-version seed seed-core seed-mpp db-setup db-reset dev build run
+.PHONY: help migrate-up migrate-down migrate-create migrate-force migrate-version seed seed-core seed-mpp db-setup db-reset dev build run test test-cover
 
 help:
 	@echo "Available commands:"
@@ -7,6 +7,10 @@ help:
 	@echo "  make dev                     - Run with hot reload (Air)"
 	@echo "  make build                   - Build application binary"
 	@echo "  make run                     - Run application"
+	@echo ""
+	@echo "Testing (loads .env so integration tests hit the compose DB):"
+	@echo "  make test                    - Run all tests"
+	@echo "  make test-cover              - Run all tests with coverage"
 	@echo ""
 	@echo "Database migrations:"
 	@echo "  make migrate-up              - Run all pending migrations"
@@ -32,6 +36,12 @@ SEEDERS_PATH=internal/database/seeders
 # Default values from .env
 include .env
 export
+
+test:
+	go test ./...
+
+test-cover:
+	go test -cover ./...
 
 migrate-up:
 	@echo "Running migrations..."

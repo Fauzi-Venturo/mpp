@@ -27,11 +27,16 @@ yarn fm:check       # prettier --check
 yarn fm:fix         # prettier --write
 yarn fix:all        # lint:fix + fm:fix (run before committing)
 
-yarn tsc:check      # tsc --noEmit --pretty (type-check, no test runner exists)
+yarn tsc:check      # tsc --noEmit --pretty (type-check)
 yarn tsc:watch      # type-check in watch mode
+
+yarn test           # Vitest run (unit + component tests)
+yarn test:watch     # Vitest in watch mode
 ```
 
-There is **no test framework** configured — `tsc:check` plus lint are the verification gates, enforced automatically: husky pre-commit runs lint-staged (eslint + prettier on staged files), pre-push runs `tsc:check`, and the `Jenkinsfile` runs the full gate (install → lint → fm:check → tsc:check → build) in CI. Yarn is the ONLY package manager (`packageManager: yarn@1.22.22`, Node >= 22.12, see `.nvmrc`); never use npm or commit a `package-lock.json`.
+**Testing (added 2026-08-05 — MPP is built TDD-first):** Vitest + Testing Library, environment `happy-dom`. Config in [vitest.config.mts](vitest.config.mts), setup in [vitest.setup.ts](vitest.setup.ts) (jest-dom matchers + auto `cleanup`). Tests live next to the code as `*.test.ts(x)` under `src/`. Write the failing test before the implementation. Run on the Node version in `.nvmrc` (22) — jsdom 30 refuses Node 25, which is one reason this setup uses happy-dom.
+
+`tsc:check` plus lint remain verification gates too, enforced automatically: husky pre-commit runs lint-staged (eslint + prettier on staged files), pre-push runs `tsc:check`, and the `Jenkinsfile` runs the full gate (install → lint → fm:check → tsc:check → build) in CI. Yarn is the ONLY package manager (`packageManager: yarn@1.22.22`, Node >= 22.12, see `.nvmrc`); never use npm or commit a `package-lock.json`.
 
 **Production Docker:** `docker compose up -d --build` — multi-stage standalone image listening on port 80, env from `.env.prod` (gitignored). `NEXT_PUBLIC_*` values are baked into the bundle at image BUILD time — changing them requires a rebuild, not a restart; server-only vars (`API_URL`, `REVALIDATE_TOKEN`) also flow at runtime via compose `env_file`. `output: 'standalone'` only activates when `BUILD_STANDALONE=true` (set by the Dockerfile), so plain `yarn build`/`yarn start` behave as before.
 

@@ -18,6 +18,9 @@ import (
 	"github.com/ndollem/mpp/apps/api/internal/modules/core/user"
 	userRepo "github.com/ndollem/mpp/apps/api/internal/modules/core/user/repository"
 
+	// MPP modules
+	"github.com/ndollem/mpp/apps/api/internal/modules/mpp/booking"
+
 	"github.com/ndollem/mpp/apps/api/internal/shared/audit"
 	"github.com/ndollem/mpp/apps/api/internal/shared/authz"
 	sharedRedis "github.com/ndollem/mpp/apps/api/internal/shared/redis"
@@ -206,6 +209,15 @@ func Setup(router *gin.Engine, db *pgxpool.Pool, cfg *config.Config) {
 	// mount under /core/v1.
 	auditModule := audit.Initialize(db)
 	auditModule.SetupRoutes(coreV1)
+
+	// MPP v1 routes (queue domain)
+	mppV1 := router.Group("/mpp/v1")
+	{
+		// Public registration. The tenant comes from X-Company-Slug rather
+		// than a JWT claim, so no JWTAuth here.
+		bookingModule := booking.Initialize(db)
+		bookingModule.SetupRoutes(mppV1)
+	}
 
 	log.Info("Routes setup completed", zap.Int("routes", len(router.Routes())))
 }

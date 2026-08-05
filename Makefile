@@ -50,8 +50,8 @@ api-build: ## Build backend binary
 	cd $(API_DIR) && make build
 
 .PHONY: api-test
-api-test: ## Run backend tests
-	cd $(API_DIR) && go test ./...
+api-test: ## Run backend tests (integration tests use the compose DB via apps/api/.env)
+	cd $(API_DIR) && make test
 
 .PHONY: db-setup
 db-setup: ## Run backend migrations + seeders (core, then mpp)
@@ -82,9 +82,13 @@ web-lint: ## Lint the frontend
 web-check: ## Type-check the frontend (tsc --noEmit)
 	cd $(WEB_DIR) && yarn tsc:check
 
+.PHONY: web-test
+web-test: ## Run frontend tests (Vitest)
+	cd $(WEB_DIR) && yarn test
+
 ## ── Meta ────────────────────────────────────────────────────────────────────
 .PHONY: check
-check: api-test web-check ## Run backend tests + frontend type-check
+check: api-test web-test web-check ## Run backend tests + frontend tests + type-check
 
 .PHONY: help
 help: ## Show this help

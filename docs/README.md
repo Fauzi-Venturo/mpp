@@ -8,6 +8,7 @@ ditulis dalam **Bahasa Indonesia**, dokumen teknis dalam **English** (bilingual)
 1. **Overview** — pahami produk & istilah
    - [`00-overview/product-brief.md`](./00-overview/product-brief.md) — visi, tujuan, ruang lingkup _(ID)_
    - [`00-overview/glossary.md`](./00-overview/glossary.md) — kamus istilah domain _(ID/EN)_
+   - [`00-overview/battle-w04-mpp-relay.md`](./00-overview/battle-w04-mpp-relay.md) — aturan & kontrak Battle #1 MPP Relay (w04) _(ID)_
 2. **Requirements** — apa yang harus dibangun
    - [`01-requirements/prd.md`](./01-requirements/prd.md) — Product Requirements Document _(ID)_
    - [`01-requirements/functional-requirements.md`](./01-requirements/functional-requirements.md) — FR per modul (18 modul) _(ID)_

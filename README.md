@@ -65,6 +65,23 @@ make web-dev      # http://localhost:8002
 Atau jalankan seluruh stack dalam container: `make up-full`.
 Lihat semua perintah: `make help`.
 
+## Testing (TDD)
+
+Fitur dikerjakan **test-first**: tulis test yang gagal dulu, baru implementasinya.
+
+```bash
+make check        # gate lengkap: backend test + frontend test + type-check
+make api-test     # Go — testify; integration test pakai Postgres/Redis dari compose
+make web-test     # Vitest + Testing Library (happy-dom)
+```
+
+- Backend: helper `internal/testsupport` menyediakan `Postgres(t)`/`Redis(t)`; test
+  **skip** (bukan gagal) kalau `make up` belum dijalankan. Jalankan lewat `make api-test`,
+  bukan `go test ./...` telanjang, supaya `.env` ikut ter-export.
+- Frontend: test berdampingan dengan kode sebagai `src/**/*.test.ts(x)`.
+- Catatan mesin lokal: kalau port 5432 sudah dipakai Postgres lain, `.env` memakai
+  `POSTGRES_PORT=5433` — samakan dengan `DB_PORT` di `apps/api/.env`.
+
 ## Database: PostgreSQL & Supabase
 
 Development lokal memakai Postgres + Redis dari `docker-compose.yml`. Untuk hosting
