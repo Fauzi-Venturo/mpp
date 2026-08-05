@@ -3,15 +3,26 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/ndollem/mpp/apps/api/internal/modules/mpp/booking/domain"
 	"github.com/ndollem/mpp/apps/api/internal/modules/mpp/booking/dto"
 	"github.com/ndollem/mpp/apps/api/internal/modules/mpp/booking/repository"
+	"github.com/ndollem/mpp/apps/api/pkg/qrtoken"
 )
+
+// defaultCheckinWindow keeps a QR token usable for the whole booking day, counted
+// from 00:00 of that day (BR-09).
+// ponytail: a constant until mpp.system_config actually seeds `checkin_window`
+// (migrations/mpp/000005_config.up.sql); read it from there once per-instansi
+// windows are configured.
+const defaultCheckinWindow = 24 * time.Hour
 
 var (
 	// ErrTenantRequired means the X-Company-Slug header was missing.
 	ErrTenantRequired = errors.New("company slug is required")
+	// ErrBookingNotFound maps to 404 on the detail endpoint.
+	ErrBookingNotFound = repository.ErrBookingNotFound
 	// ErrServiceNotFound covers unknown tenant, unknown instansi and unknown
 	// service alike — a public endpoint must not disclose which one it was.
 	ErrServiceNotFound = repository.ErrServiceNotFound
@@ -45,6 +56,11 @@ func (s *BookingService) Create(ctx context.Context, companySlug string, req dto
 		channel = domain.BookingChannelWeb
 	}
 
+	qr, err := qrtoken.Issue(req.Tanggal.Time, defaultCheckinWindow)
+	if err != nil {
+		return nil, err
+	}
+
 	return s.bookingRepo.Create(ctx, repository.CreateParams{
 		CompanySlug:    companySlug,
 		InstansiID:     req.InstansiID,
@@ -54,7 +70,14 @@ func (s *BookingService) Create(ctx context.Context, companySlug string, req dto
 		PemohonName:    req.Pemohon.Name,
 		PemohonPhone:   optional(req.Pemohon.Phone),
 		PemohonEmail:   optional(req.Pemohon.Email),
+		QRToken:        qr.Value,
+		QRExpiresAt:    qr.ExpiresAt,
 	})
+}
+
+// GetByID returns one booking, including its QR token, for the ticket screen.
+func (s *BookingService) GetByID(ctx context.Context, id string) (*domain.Booking, error) {
+	return s.bookingRepo.GetByID(ctx, id)
 }
 
 func optional(s string) *string {

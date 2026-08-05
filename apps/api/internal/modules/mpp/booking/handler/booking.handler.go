@@ -47,3 +47,19 @@ func (h *BookingHandler) Create(c *gin.Context) {
 
 	response.Success(c, http.StatusCreated, "Booking created successfully", booking)
 }
+
+// GetByID handles GET /mpp/v1/booking/:id — the ticket screen reads the QR token here.
+func (h *BookingHandler) GetByID(c *gin.Context) {
+	booking, err := h.bookingService.GetByID(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrBookingNotFound):
+			response.Error(c, http.StatusNotFound, "Booking not found", "")
+		default:
+			response.Error(c, http.StatusInternalServerError, "Failed to load booking", err.Error())
+		}
+		return
+	}
+
+	response.Success(c, http.StatusOK, "Booking retrieved successfully", booking)
+}

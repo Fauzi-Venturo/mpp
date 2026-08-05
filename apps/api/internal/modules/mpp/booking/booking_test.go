@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -109,11 +110,19 @@ func post(r *gin.Engine, slug, body string) *httptest.ResponseRecorder {
 
 type envelope struct {
 	Data struct {
-		ID     string `json:"id"`
-		Status string `json:"status"`
+		ID          string    `json:"id"`
+		Status      string    `json:"status"`
+		QRToken     string    `json:"qr_token"`
+		QRExpiresAt time.Time `json:"qr_expires_at"`
 	} `json:"data"`
 	Message string              `json:"message"`
 	Errors  map[string][]string `json:"errors"`
+}
+
+func get(r *gin.Engine, path string) *httptest.ResponseRecorder {
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+	return w
 }
 
 func decode(t *testing.T, w *httptest.ResponseRecorder) envelope {
@@ -199,6 +208,70 @@ func TestCreateBooking_UnknownCompanySlug(t *testing.T) {
 
 	require.Equal(t, http.StatusNotFound, w.Code, "body: %s", w.Body.String())
 	require.Equal(t, 0, f.terpakai(t), "a foreign tenant must not consume quota")
+}
+
+// Slice 2 — BR-09: booking must hand out a single-use, time-bound check-in token.
+
+func (f fixture) storedToken(t *testing.T, bookingID string) string {
+	t.Helper()
+	var tok *string
+	require.NoError(t, f.db.QueryRow(context.Background(),
+		`SELECT qr_token FROM mpp.booking WHERE id = $1`, bookingID).Scan(&tok))
+	require.NotNil(t, tok, "qr_token must be persisted, not only returned")
+	return *tok
+}
+
+func TestCreateBooking_IssuesAQrTokenValidUntilTheEndOfTheBookingDay(t *testing.T) {
+	db := testsupport.Postgres(t)
+	f := newQuota(t, db, "2099-01-07", 10, 0)
+
+	w := post(newServer(db), tenantSlug, f.body("Rina"))
+
+	require.Equal(t, http.StatusCreated, w.Code, "body: %s", w.Body.String())
+	e := decode(t, w)
+	require.NotEmpty(t, e.Data.QRToken, "booking response must carry the QR token")
+	require.Equal(t, e.Data.QRToken, f.storedToken(t, e.Data.ID))
+	require.Equal(t,
+		time.Date(2099, 1, 8, 0, 0, 0, 0, time.UTC),
+		e.Data.QRExpiresAt.UTC(),
+		"token must expire when the booking day ends")
+}
+
+func TestCreateBooking_GivesEveryBookingItsOwnToken(t *testing.T) {
+	db := testsupport.Postgres(t)
+	f := newQuota(t, db, "2099-01-08", 10, 0)
+	r := newServer(db)
+
+	first := decode(t, post(r, tenantSlug, f.body("Andi")))
+	second := decode(t, post(r, tenantSlug, f.body("Bayu")))
+
+	require.NotEmpty(t, first.Data.QRToken)
+	require.NotEqual(t, first.Data.QRToken, second.Data.QRToken)
+}
+
+func TestGetBooking_ReturnsTheSameToken(t *testing.T) {
+	db := testsupport.Postgres(t)
+	f := newQuota(t, db, "2099-01-09", 10, 0)
+	r := newServer(db)
+	created := decode(t, post(r, tenantSlug, f.body("Citra")))
+
+	w := get(r, "/mpp/v1/booking/"+created.Data.ID)
+
+	require.Equal(t, http.StatusOK, w.Code, "body: %s", w.Body.String())
+	e := decode(t, w)
+	require.Equal(t, created.Data.ID, e.Data.ID)
+	require.Equal(t, created.Data.QRToken, e.Data.QRToken)
+}
+
+func TestGetBooking_UnknownIDIsNotFound(t *testing.T) {
+	db := testsupport.Postgres(t)
+
+	w := get(newServer(db), "/mpp/v1/booking/aaaaaaaa-0000-0000-0000-000000000000")
+
+	require.Equal(t, http.StatusNotFound, w.Code, "body: %s", w.Body.String())
+	// The envelope proves the handler answered — gin's own 404 is plain text, so
+	// this test cannot pass merely because the route is missing.
+	require.NotEmpty(t, decode(t, w).Message)
 }
 
 func TestCreateBooking_InvalidPayload(t *testing.T) {

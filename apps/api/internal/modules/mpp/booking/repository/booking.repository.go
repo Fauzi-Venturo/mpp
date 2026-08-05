@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -37,6 +38,43 @@ type CreateParams struct {
 	PemohonName    string
 	PemohonPhone   *string
 	PemohonEmail   *string
+	QRToken        string
+	QRExpiresAt    time.Time
+}
+
+// ErrBookingNotFound means no live booking carries that id.
+var ErrBookingNotFound = errors.New("booking not found")
+
+const bookingByIDQuery = `
+	SELECT b.id, b.pemohon_id, b.instansi_id, b.jenis_layanan_id, b.tanggal, b.channel,
+	       b.status, b.qr_token, b.qr_expires_at, b.created_at,
+	       p.id, p.name, p.phone, p.email
+	FROM mpp.booking b
+	JOIN mpp.pemohon p ON p.id = b.pemohon_id
+	WHERE b.id = $1 AND b.deleted_at IS NULL`
+
+// GetByID returns one booking with its applicant, or ErrBookingNotFound.
+func (r *BookingRepository) GetByID(ctx context.Context, id string) (*domain.Booking, error) {
+	var (
+		booking domain.Booking
+		pemohon domain.Pemohon
+	)
+
+	err := r.db.QueryRow(ctx, bookingByIDQuery, id).Scan(
+		&booking.ID, &booking.PemohonID, &booking.InstansiID, &booking.JenisLayananID,
+		&booking.Tanggal, &booking.Channel, &booking.Status, &booking.QRToken,
+		&booking.QRExpiresAt, &booking.CreatedAt,
+		&pemohon.ID, &pemohon.Name, &pemohon.Phone, &pemohon.Email)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrBookingNotFound
+		}
+		logger.Error("Failed to load booking", logger.Err(err))
+		return nil, err
+	}
+
+	booking.Pemohon = &pemohon
+	return &booking, nil
 }
 
 // Tenancy runs through the instansi, since mpp.booking carries no company_id:
@@ -112,12 +150,16 @@ func (r *BookingRepository) Create(ctx context.Context, p CreateParams) (*domain
 
 	booking := domain.Booking{Pemohon: &pemohon}
 	err = tx.QueryRow(ctx,
-		`INSERT INTO mpp.booking (pemohon_id, instansi_id, jenis_layanan_id, tanggal, channel, status)
-		 VALUES ($1, $2, $3, $4, $5, $6)
-		 RETURNING id, pemohon_id, instansi_id, jenis_layanan_id, tanggal, channel, status, created_at`,
+		`INSERT INTO mpp.booking (pemohon_id, instansi_id, jenis_layanan_id, tanggal, channel, status,
+		                          qr_token, qr_expires_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		 RETURNING id, pemohon_id, instansi_id, jenis_layanan_id, tanggal, channel, status,
+		           qr_token, qr_expires_at, created_at`,
 		pemohon.ID, p.InstansiID, p.JenisLayananID, p.Tanggal.Time, p.Channel, domain.BookingStatusBooked,
+		p.QRToken, p.QRExpiresAt,
 	).Scan(&booking.ID, &booking.PemohonID, &booking.InstansiID, &booking.JenisLayananID,
-		&booking.Tanggal, &booking.Channel, &booking.Status, &booking.CreatedAt)
+		&booking.Tanggal, &booking.Channel, &booking.Status,
+		&booking.QRToken, &booking.QRExpiresAt, &booking.CreatedAt)
 	if err != nil {
 		logger.Error("Failed to insert booking", logger.Err(err))
 		return nil, err

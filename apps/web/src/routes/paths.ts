@@ -18,6 +18,12 @@ export const paths = {
     details: (slug: string) => `/article/${slug}`,
   },
   /**
+   * Booking (MPP queue)
+   */
+  booking: {
+    details: (id: string) => `/booking/${id}`,
+  },
+  /**
    * Common
    */
   maintenance: '/maintenance',

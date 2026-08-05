@@ -41,6 +41,9 @@ type Booking struct {
 	Tanggal        types.Date     `json:"tanggal"`
 	Channel        BookingChannel `json:"channel"`
 	Status         BookingStatus  `json:"status"`
-	CreatedAt      time.Time      `json:"created_at"`
-	Pemohon        *Pemohon       `json:"pemohon,omitempty"`
+	// QRToken is the single-use check-in token (BR-09); QRExpiresAt closes its window.
+	QRToken     string    `json:"qr_token"`
+	QRExpiresAt time.Time `json:"qr_expires_at"`
+	CreatedAt   time.Time `json:"created_at"`
+	Pemohon     *Pemohon  `json:"pemohon,omitempty"`
 }

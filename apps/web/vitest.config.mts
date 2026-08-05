@@ -12,9 +12,15 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     globals: true,
-    // Storage/API are UTC; the UI renders WIB — pin the zone so date assertions
-    // don't drift with the machine running the suite.
-    env: { TZ: 'Asia/Jakarta' },
+    env: {
+      // Storage/API are UTC; the UI renders WIB — pin the zone so date assertions
+      // don't drift with the machine running the suite.
+      TZ: 'Asia/Jakarta',
+      // src/lib/env.ts validates at import time, so any module reaching the API
+      // layer needs these. Fixed dummies keep tests independent of a local .env.
+      NEXT_PUBLIC_API_URL: 'http://api.test',
+      NEXT_PUBLIC_COMPANY_SLUG: 'mpp-test',
+    },
     setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
   },

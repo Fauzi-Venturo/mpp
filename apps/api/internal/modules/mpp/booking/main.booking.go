@@ -33,4 +33,5 @@ func Initialize(db *pgxpool.Pool) *BookingModule {
 // tenant comes from the X-Company-Slug header instead of a JWT claim.
 func (m *BookingModule) SetupRoutes(router *gin.RouterGroup) {
 	router.POST("/booking", m.Handler.Create)
+	router.GET("/booking/:id", m.Handler.GetByID)
 }
